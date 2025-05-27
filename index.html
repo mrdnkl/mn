@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Instagram Live Stream Player & Downloader</title>
+      <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
+      <script>
+         tailwind.config = {
+            theme: {
+               extend: {
+                  colors: {
+                     instagram: {
+                        100: "#fcdfeb",
+                        200: "#ffc0d7",
+                        300: "#ffa1c3",
+                        400: "#ff82af",
+                        500: "#ff639b",
+                        600: "#cc4f7c",
+                        700: "#993b5d",
+                        800: "#66273e",
+                        900: "#33131f",
+                     },
+                  },
+               },
+            },
+         };
+      </script>
+   </head>
+   <body class="bg-gradient-to-br from-instagram-100 to-instagram-300 min-h-screen flex items-center justify-center p-4 font-sans">
+      <div class="bg-white bg-opacity-90 rounded-lg shadow-md p-6 w-full max-w-sm">
+         <h1 class="text-2xl font-bold text-center mb-4 text-instagram-600">
+            <i class="fab fa-instagram mr-2"></i>Instagram Live Player & Downloader
+         </h1>
+
+         <div id="errorMessage" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm"></div>
+
+         <div class="mb-4">
+            <label for="streamUrl" class="block text-sm font-medium text-gray-700 mb-1">DASH Stream URL:</label>
+            <input type="text" id="streamUrl" placeholder="Enter URL here" 
+                   class="w-full px-3 py-2 border border-instagram-300 rounded-md focus:outline-none focus:ring-1 focus:ring-instagram-500 focus:border-instagram-500 text-sm"/>
+         </div>
+
+         <button id="loadStream" class="w-full bg-instagram-500 text-white px-4 py-2 rounded-md hover:bg-instagram-600 transition duration-200 flex items-center justify-center mb-4">
+            <i class="fas fa-play-circle mr-2"></i>Load Preview
+         </button>
+
+         <div class="mb-4 relative w-full rounded-md overflow-hidden shadow-sm" style="padding-top: 177.78%">
+            <video id="videoPlayer" controls autoplay class="absolute top-0 left-0 w-full h-full object-cover bg-black"></video>
+         </div>
+
+         <div class="flex justify-between space-x-2 mb-4">
+            <button id="startRecord" disabled 
+                    class="flex-1 bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm">
+               <i class="fas fa-record-vinyl mr-1"></i>Start Download
+            </button>
+            <button id="stopRecord" disabled 
+                    class="flex-1 bg-red-500 text-white px-3 py-2 rounded-md hover:bg-red-600 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm">
+               <i class="fas fa-stop-circle mr-1"></i>Stop Download
+            </button>
+         </div>
+
+         <div id="downloadProgress" class="hidden">
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+               <div id="progressBar" class="bg-instagram-500 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <div id="progressText" class="text-sm text-center text-gray-600"></div>
+         </div>
+
+         <div id="recordingTimer" class="mt-1 text-center text-xl font-bold text-instagram-600 hidden"></div>
+      </div>
+
+      <script>
+         let player;
+         let downloadStream = null;
+         let isDownloading = false;
+         let recordedSegments = [];
+         let recordStartTime;
+         let timerInterval;
+
+         function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            errorDiv.classList.remove('bg-green-100', 'text-green-700');
+            errorDiv.classList.add('bg-red-100', 'text-red-700');
+         }
+
+         function showSuccess(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.classList.remove('hidden');
+            errorDiv.classList.remove('bg-red-100', 'text-red-700');
+            errorDiv.classList.add('bg-green-100', 'text-green-700');
+            errorDiv.textContent = message;
+         }
+
+         function updateTimer() {
+            if (!recordStartTime) return;
+            const now = new Date().getTime();
+            const duration = new Date(now - recordStartTime);
+            const minutes = duration.getUTCMinutes().toString().padStart(2, "0");
+            const seconds = duration.getUTCSeconds().toString().padStart(2, "0");
+            document.getElementById("recordingTimer").textContent = `Downloading: ${minutes}:${seconds}`;
+         }
+
+         async function startDownloadStream(url) {
+            try {
+                isDownloading = true;
+                recordStartTime = new Date().getTime();
+                recordedSegments = [];
+                
+                // Parse MPD
+                const response = await fetch(url);
+                const mpd = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(mpd, "text/xml");
+                
+                const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+                downloadStream = setInterval(() => downloadSegments(xmlDoc, baseUrl), 1000);
+                
+                document.getElementById('startRecord').disabled = true;
+                document.getElementById('stopRecord').disabled = false;
+                document.getElementById('recordingTimer').classList.remove('hidden');
+                document.getElementById('downloadProgress').classList.remove('hidden');
+                timerInterval = setInterval(updateTimer, 1000);
+                
+                showSuccess('Download started! You can close the preview.');
+            } catch (error) {
+                console.error('Download error:', error);
+                showError('Failed to start download: ' + error.message);
+                stopDownloadStream();
+            }
+         }
+
+         async function downloadSegments(xmlDoc, baseUrl) {
+            if (!isDownloading) return;
+
+            const segments = xmlDoc.querySelectorAll('SegmentTemplate');
+            
+            for (const segment of segments) {
+                if (!isDownloading) break;
+
+                const media = segment.getAttribute('media');
+                const initialization = segment.getAttribute('initialization');
+                
+                // Get initialization segment if not already downloaded
+                if (initialization && recordedSegments.length === 0) {
+                    const initUrl = baseUrl + initialization.replace('$RepresentationID$', '1');
+                    try {
+                        const response = await fetch(initUrl);
+                        const data = await response.arrayBuffer();
+                        recordedSegments.push(data);
+                    } catch (error) {
+                        console.error('Error downloading initialization segment:', error);
+                    }
+                }
+
+                // Download next media segment
+                const segmentNumber = Math.floor(recordedSegments.length / 2);
+                const segmentUrl = baseUrl + media
+                    .replace('$RepresentationID$', '1')
+                    .replace('$Number$', segmentNumber);
+                
+                try {
+                    const response = await fetch(segmentUrl);
+                    if (response.ok) {
+                        const data = await response.arrayBuffer();
+                        recordedSegments.push(data);
+                        updateProgress();
+                    }
+                } catch (error) {
+                    console.error('Error downloading segment:', error);
+                }
+            }
+         }
+
+         function stopDownloadStream() {
+            isDownloading = false;
+            if (downloadStream) {
+                clearInterval(downloadStream);
+                downloadStream = null;
+            }
+            clearInterval(timerInterval);
+            
+            document.getElementById('startRecord').disabled = false;
+            document.getElementById('stopRecord').disabled = true;
+            document.getElementById('recordingTimer').classList.add('hidden');
+            
+            if (recordedSegments.length > 0) {
+                // Combine segments and download
+                const blob = new Blob(recordedSegments, { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `instagram_live_${new Date().getTime()}.mp4`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                document.getElementById('downloadProgress').classList.add('hidden');
+                showSuccess('Download completed successfully!');
+            }
+            
+            recordedSegments = [];
+            recordStartTime = null;
+         }
+
+         function updateProgress() {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const segmentSize = recordedSegments.length;
+            // Assuming roughly 100 segments is a complete download
+            const percent = Math.min((segmentSize / 100) * 100, 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `Downloaded segments: ${segmentSize}`;
+         }
+
+         document.getElementById('loadStream').addEventListener('click', function() {
+            const url = document.getElementById('streamUrl').value;
+            if (!url) {
+                showError('Please enter a stream URL');
+                return;
+            }
+
+            try {
+                if (player) {
+                    player.reset();
+                }
+                player = dashjs.MediaPlayer().create();
+                player.initialize(document.querySelector("#videoPlayer"), url, true);
+
+                player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+                    const videoQualities = player.getBitrateInfoListFor("video");
+                    const audioQualities = player.getBitrateInfoListFor("audio");
+
+                    if (videoQualities && videoQualities.length > 0) {
+                        player.setQualityFor("video", videoQualities.length - 1);
+                    }
+                    if (audioQualities && audioQualities.length > 0) {
+                        player.setQualityFor("audio", audioQualities.length - 1);
+                    }
+
+                    document.getElementById("startRecord").disabled = false;
+                    showSuccess('Stream loaded successfully!');
+                });
+
+                player.on(dashjs.MediaPlayer.events.ERROR, function(error) {
+                    showError("Error loading stream. Please check the URL and try again.");
+                });
+
+            } catch (error) {
+                console.error("Stream loading error:", error);
+                showError("Error initializing video player. Please try again.");
+            }
+         });
+
+         document.getElementById('startRecord').addEventListener('click', function() {
+            const url = document.getElementById('streamUrl').value;
+            if (url) {
+                startDownloadStream(url);
+            } else {
+                showError('Please enter a stream URL');
+            }
+         });
+
+         document.getElementById('stopRecord').addEventListener('click', stopDownloadStream);
+      </script>
+   </body>
+</html>
