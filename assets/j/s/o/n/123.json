@@ -2,13 +2,13 @@
     {
       "ChannelName": "Skysports Main Event",
       "IconURL": "https://r1.thesportsdb.com/images/media/channel/logo/mp44981502554837.png",
-      "StreamURL": "https://donelfantastic.github.io/webiptv/web/skysports-main-event/index.m3u8",
+      "StreamURL": "https://donelfantastic.github.io/webiptv/live/skySportsMEUk.m3u8",
       "GenreName": "Sports"
     },
     {
       "ChannelName": "Skysports Premier League",
       "IconURL": "https://r1.thesportsdb.com/images/media/channel/logo/b8avz51719570023.png",
-      "StreamURL": "https://donelfantastic.github.io/webiptv/web/skysports-premier-league/index.m3u8",
+      "StreamURL": "https://donelfantastic.github.io/webiptv/live/skySportsPLUk.m3u8",
       "GenreName": "Sports"
     }
 ]
