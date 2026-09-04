@@ -1,14 +1,14 @@
 [
     {
-      "ChannelName": "Skysports Main Event",
-      "IconURL": "https://r1.thesportsdb.com/images/media/channel/logo/mp44981502554837.png",
-      "StreamURL": "https://donelfantastic.github.io/webiptv/live/skySportsMEUk.m3u8",
+      "ChannelName": "BEIN SPORTS XTRA",
+      "IconURL": "https://static.wikia.nocookie.net/logopedia/images/e/ee/BeIN_Sports_Xtra_en_Espanol.webp",
+      "StreamURL": "https://amg01334-beinsportsllc-beinxtra-localnow-kcy6r.amagi.tv/playlist.m3u8",
       "GenreName": "Sports"
     },
     {
-      "ChannelName": "Skysports Premier League",
-      "IconURL": "https://r1.thesportsdb.com/images/media/channel/logo/b8avz51719570023.png",
-      "StreamURL": "https://donelfantastic.github.io/webiptv/live/skySportsPLUk.m3u8",
+      "ChannelName": "FUBO SPORTS NETWORK",
+      "IconURL": "https://static.wikia.nocookie.net/logopedia/images/9/9f/Fubo_Sports_Network_%282023%29.png",
+      "StreamURL": "https://aka-live1050.delivery.roku.com/4fce7c00-6a39-4c09-bc6c-2ae2c006e87e/t2-origin/out/v1/live.m3u8",
       "GenreName": "Sports"
     }
 ]
